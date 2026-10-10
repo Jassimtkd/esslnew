@@ -1,0 +1,6 @@
+CREATE TABLE IF NOT EXISTS essl_attendance_logs (
+  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  received_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  content_type TEXT,
+  body_base64 TEXT NOT NULL
+);
