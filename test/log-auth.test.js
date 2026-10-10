@@ -29,6 +29,14 @@ test("rejects missing, incorrect, or unconfigured credentials", () => {
   assert.equal(hasLogViewerAccess("Bearer token", username, password), false);
 });
 
+test("dashboard remains disabled until viewer credentials are configured", async () => {
+  const response = createLogAuthFailure(null, undefined, undefined);
+
+  assert.equal(response.status, 503);
+  assert.equal(await response.text(), "Dashboard access is not configured");
+  assert.equal(response.headers.get("www-authenticate"), null);
+});
+
 test("authentication rejects requests without credentials", () => {
   process.env.LOG_VIEWER_USERNAME = username;
   process.env.LOG_VIEWER_PASSWORD = password;

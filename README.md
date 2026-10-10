@@ -8,7 +8,7 @@ Set these Vercel environment variables. Never commit their values.
 
 - `ESSL_DEVICE_KEY`: a long, unique key used in the device URL.
 - `DATABASE_URL`: the Neon Postgres connection string; use Neon’s pooled connection string on Vercel.
-- `LOG_VIEWER_USERNAME` and `LOG_VIEWER_PASSWORD`: credentials for the HTTP Basic authentication prompt protecting the dashboard and log API.
+- `LOG_VIEWER_USERNAME` and `LOG_VIEWER_PASSWORD`: credentials for the HTTP Basic authentication prompt protecting the dashboard and log API. Until both are configured, dashboard and log API access stays disabled; device collection is unaffected.
 
 The receiver URL is `https://<vercel-assigned-domain>/api/essl/<ESSL_DEVICE_KEY>`. GET returns the ESSL handshake. POST stores the raw body and responds `OK` only after the database write succeeds; it never forwards the payload. Bodies larger than 64 KB are rejected. Device serials are read from `SN`, `sn`, `deviceId`, `device_id`, or `serial` query parameters when present.
 
