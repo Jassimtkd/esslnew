@@ -12,15 +12,15 @@ Configure the device with `https://<vercel-assigned-domain>/api/essl`. Do not us
 
 ## Neon Database
 
-1. Create a Neon Postgres project and copy its pooled connection string into `DATABASE_URL`.
-2. Run [`db/schema.sql`](db/schema.sql) in the Neon SQL Editor. It creates the logs table and adds searchable columns if the earlier schema already exists.
+1. Create a Neon Postgres project and set its pooled connection string as `DATABASE_URL` in Vercel.
+2. On first access, the app creates the logs table and required columns automatically. [`db/schema.sql`](db/schema.sql) is also available for manual setup.
 3. Attendance records retain the exact request bytes as base64 alongside searchable text, device identifier, content type, and receive time. Records remain until manually deleted; set a retention policy appropriate for biometric data.
 
 ## Vercel Deployment
 
 1. Import this GitHub repository into Vercel using the Next.js framework preset.
 2. Set `DATABASE_URL` in Vercel's project environment.
-3. Run [`db/schema.sql`](db/schema.sql) in Neon if the attendance table has not been created yet.
+3. Confirm the Vercel project has the Neon-provided `DATABASE_URL` environment variable.
 4. Deploy the project. Use the domain Vercel assigns; no domain is assumed by the app.
 5. Set the device server URL to `https://<vercel-assigned-domain>/api/essl`.
 6. Open the Vercel-assigned domain or append `/logs` to view the dashboard.
