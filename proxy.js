@@ -4,6 +4,10 @@ import { DASHBOARD_SESSION_COOKIE, hasDashboardSession } from "./lib/log-auth.js
 export function proxy(request) {
   const secret = process.env.AUTH_SECRET;
   if (!secret || secret.length < 32) {
+    if (!request.nextUrl.pathname.startsWith("/api/")) {
+      return Response.redirect(new URL("/login", request.url));
+    }
+
     return new Response("Dashboard authentication is not configured", {
       status: 503,
       headers: { "cache-control": "no-store" },

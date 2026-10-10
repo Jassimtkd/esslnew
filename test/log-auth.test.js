@@ -9,6 +9,12 @@ import { config, proxy } from "../proxy.js";
 
 const secret = "test-auth-secret-that-is-at-least-thirty-two-characters";
 const now = 1_800_000_000_000;
+const originalSecret = process.env.AUTH_SECRET;
+
+function restoreSecret() {
+  if (originalSecret === undefined) delete process.env.AUTH_SECRET;
+  else process.env.AUTH_SECRET = originalSecret;
+}
 
 test("dashboard session is signed, email-restricted, and expires", () => {
   const token = createDashboardSession(DASHBOARD_EMAIL, secret, now);
@@ -21,7 +27,6 @@ test("dashboard session is signed, email-restricted, and expires", () => {
 });
 
 test("proxy protects dashboard and log API, redirecting pages to login", () => {
-  const originalSecret = process.env.AUTH_SECRET;
   process.env.AUTH_SECRET = secret;
   const unauthenticated = {
     url: "https://receiver.test/logs",
@@ -40,12 +45,26 @@ test("proxy protects dashboard and log API, redirecting pages to login", () => {
   assert.equal(apiResponse.status, 401);
   assert.deepEqual(config.matcher, ["/logs/:path*", "/api/logs/:path*"]);
 
-  if (originalSecret === undefined) delete process.env.AUTH_SECRET;
-  else process.env.AUTH_SECRET = originalSecret;
+  restoreSecret();
+});
+
+test("proxy redirects dashboard to public login when auth is not configured", () => {
+  delete process.env.AUTH_SECRET;
+  const request = {
+    url: "https://receiver.test/logs",
+    nextUrl: { pathname: "/logs" },
+    headers: new Headers(),
+    cookies: { get: () => undefined },
+  };
+
+  const response = proxy(request);
+
+  assert.equal(response.status, 302);
+  assert.equal(response.headers.get("location"), "https://receiver.test/login");
+  restoreSecret();
 });
 
 test("proxy permits a valid session and prevents caching", () => {
-  const originalSecret = process.env.AUTH_SECRET;
   process.env.AUTH_SECRET = secret;
   const token = createDashboardSession(DASHBOARD_EMAIL, secret);
   const request = {
@@ -59,6 +78,5 @@ test("proxy permits a valid session and prevents caching", () => {
 
   assert.equal(response.status, 200);
   assert.equal(response.headers.get("cache-control"), "private, no-store");
-  if (originalSecret === undefined) delete process.env.AUTH_SECRET;
-  else process.env.AUTH_SECRET = originalSecret;
+  restoreSecret();
 });
