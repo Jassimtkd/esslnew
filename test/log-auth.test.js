@@ -1,56 +1,64 @@
 import assert from "node:assert/strict";
-import { afterEach, test } from "node:test";
-import { createLogAuthFailure, hasLogViewerAccess } from "../lib/log-auth.js";
+import { test } from "node:test";
+import {
+  createDashboardSession,
+  DASHBOARD_EMAIL,
+  hasDashboardSession,
+} from "../lib/log-auth.js";
+import { config, proxy } from "../proxy.js";
 
-const username = "log-admin";
-const password = "test-only-password";
-const authorization = `Basic ${Buffer.from(`${username}:${password}`).toString("base64")}`;
-const originalUsername = process.env.LOG_VIEWER_USERNAME;
-const originalPassword = process.env.LOG_VIEWER_PASSWORD;
+const secret = "test-auth-secret-that-is-at-least-thirty-two-characters";
+const now = 1_800_000_000_000;
 
-function restoreEnv(name, value) {
-  if (value === undefined) delete process.env[name];
-  else process.env[name] = value;
-}
+test("dashboard session is signed, email-restricted, and expires", () => {
+  const token = createDashboardSession(DASHBOARD_EMAIL, secret, now);
 
-afterEach(() => {
-  restoreEnv("LOG_VIEWER_USERNAME", originalUsername);
-  restoreEnv("LOG_VIEWER_PASSWORD", originalPassword);
+  assert.equal(hasDashboardSession(token, secret, now), true);
+  assert.equal(hasDashboardSession(token, `${secret}x`, now), false);
+  assert.equal(hasDashboardSession(token, secret, now + 8 * 60 * 60 * 1000), false);
+  assert.throws(() => createDashboardSession("someone@example.com", secret, now));
+  assert.throws(() => createDashboardSession(DASHBOARD_EMAIL, "short", now));
 });
 
-test("accepts the configured Basic authentication credentials", () => {
-  assert.equal(hasLogViewerAccess(authorization, username, password), true);
+test("proxy protects dashboard and log API, redirecting pages to login", () => {
+  const originalSecret = process.env.AUTH_SECRET;
+  process.env.AUTH_SECRET = secret;
+  const unauthenticated = {
+    url: "https://receiver.test/logs",
+    nextUrl: { pathname: "/logs" },
+    headers: new Headers(),
+    cookies: { get: () => undefined },
+  };
+  const pageResponse = proxy(unauthenticated);
+  const apiResponse = proxy({
+    ...unauthenticated,
+    nextUrl: { pathname: "/api/logs" },
+  });
+
+  assert.equal(pageResponse.status, 302);
+  assert.equal(pageResponse.headers.get("location"), "https://receiver.test/login");
+  assert.equal(apiResponse.status, 401);
+  assert.deepEqual(config.matcher, ["/logs/:path*", "/api/logs/:path*"]);
+
+  if (originalSecret === undefined) delete process.env.AUTH_SECRET;
+  else process.env.AUTH_SECRET = originalSecret;
 });
 
-test("rejects missing, incorrect, or unconfigured credentials", () => {
-  assert.equal(hasLogViewerAccess(null, username, password), false);
-  assert.equal(hasLogViewerAccess(authorization, username, "wrong-password"), false);
-  assert.equal(hasLogViewerAccess(authorization, undefined, password), false);
-  assert.equal(hasLogViewerAccess("Bearer token", username, password), false);
-});
+test("proxy permits a valid session and prevents caching", () => {
+  const originalSecret = process.env.AUTH_SECRET;
+  process.env.AUTH_SECRET = secret;
+  const token = createDashboardSession(DASHBOARD_EMAIL, secret);
+  const request = {
+    url: "https://receiver.test/logs",
+    nextUrl: { pathname: "/logs" },
+    headers: new Headers(),
+    cookies: { get: () => ({ value: token }) },
+  };
 
-test("dashboard remains disabled until viewer credentials are configured", async () => {
-  const response = createLogAuthFailure(null, undefined, undefined);
+  const response = proxy(request);
 
-  assert.equal(response.status, 503);
-  assert.equal(await response.text(), "Dashboard access is not configured");
-  assert.equal(response.headers.get("www-authenticate"), null);
-});
-
-test("authentication rejects requests without credentials", () => {
-  process.env.LOG_VIEWER_USERNAME = username;
-  process.env.LOG_VIEWER_PASSWORD = password;
-
-  const response = createLogAuthFailure(
-    null,
-    process.env.LOG_VIEWER_USERNAME,
-    process.env.LOG_VIEWER_PASSWORD,
-  );
-
-  assert.equal(response.status, 401);
-  assert.match(response.headers.get("www-authenticate"), /^Basic/);
-});
-
-test("authentication permits valid dashboard credentials", () => {
-  assert.equal(createLogAuthFailure(authorization, username, password), null);
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("cache-control"), "private, no-store");
+  if (originalSecret === undefined) delete process.env.AUTH_SECRET;
+  else process.env.AUTH_SECRET = originalSecret;
 });

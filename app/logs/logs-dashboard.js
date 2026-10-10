@@ -69,6 +69,15 @@ export default function LogsDashboard() {
           />
           <button type="submit">Search</button>
         </form>
+        <button
+          onClick={async () => {
+            await fetch("/api/auth/logout", { method: "POST" });
+            window.location.assign("/login");
+          }}
+          type="button"
+        >
+          Sign out
+        </button>
       </header>
 
       {view.state === "loading" && <p role="status">Loading attendance logs…</p>}
