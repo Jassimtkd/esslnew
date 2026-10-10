@@ -26,7 +26,7 @@ The receiver URL is `https://<vercel-assigned-domain>/api/essl/<ESSL_DEVICE_KEY>
 5. Set the device server URL to `https://<vercel-assigned-domain>/api/essl/<ESSL_DEVICE_KEY>`.
 6. Open the Vercel-assigned domain or append `/logs` to view the dashboard.
 
-The homepage redirects directly to `/logs`. The dashboard searches device identifiers, content types, and payload text; shows 25 newest matching logs per page; and includes loading, empty, and error states. The dashboard and `/api/logs` have no login, as requested, so anyone with the app URL can read attendance data. Use Vercel Deployment Protection if you later want to restrict access.
+The homepage opens the dashboard directly. Its left sidebar has two modules: **Devices** lists detected device identifiers, log counts, and last activity; **Logs** searches device identifiers, content types, and payload text and shows 25 newest matching records per page. Both modules include loading, empty, and error states. The dashboard and its APIs have no login, as requested, so anyone with the app URL can read attendance data. Use Vercel Deployment Protection if you later want to restrict access.
 
 ## Local Checks
 
