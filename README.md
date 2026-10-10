@@ -8,7 +8,7 @@ Set `DATABASE_URL` in Vercel. No device key or app login is required for the sim
 
 - `DATABASE_URL`: the Neon Postgres connection string; use Neon’s pooled connection string on Vercel.
 
-Configure the device with `https://<vercel-assigned-domain>/api/essl`. Do not use `/logs` as the device URL. GET returns the ESSL handshake. POST stores the raw body and responds `OK` only after the database write succeeds; it never forwards the payload. Bodies larger than 64 KB are rejected. Device serials are read from `SN`, `sn`, `deviceId`, `device_id`, or `serial` query parameters when present.
+Configure the device with `https://<vercel-assigned-domain>/api/essl`. Do not use `/logs` as the device URL. GET returns the ESSL handshake. POST stores the raw body and responds `OK` only after the database write succeeds; it never forwards the payload. Bodies larger than 64 KB are rejected. Each POST writes an `ESSL_POST_RECEIPT` runtime log containing only timestamp, HTTP status, and byte count—never payloads, identifiers, or tokens. Check these under the Vercel project's Runtime Logs after a test scan. Device serials are read from `SN`, `sn`, `deviceId`, `device_id`, or `serial` query parameters when present.
 
 ## Neon Database
 

@@ -7,6 +7,7 @@ const originalFetch = globalThis.fetch;
 const deviceKey = "test-device-key";
 let handlers;
 let saveAttendance;
+let receiptLogs;
 
 function restoreEnv(name, value) {
   if (value === undefined) delete process.env[name];
@@ -20,7 +21,11 @@ function context(key = deviceKey) {
 beforeEach(() => {
   process.env.ESSL_DEVICE_KEY = deviceKey;
   saveAttendance = async () => {};
-  handlers = createEsslHandlers({ storeAttendance: (...args) => saveAttendance(...args) });
+  receiptLogs = [];
+  handlers = createEsslHandlers({
+    storeAttendance: (...args) => saveAttendance(...args),
+    logPostReceipt: (receipt) => receiptLogs.push(receipt),
+  });
   globalThis.fetch = async () => assert.fail("attendance data must not be forwarded externally");
 });
 
@@ -44,6 +49,7 @@ test("simple receiver URL works without a device key", async () => {
   const simpleHandlers = createEsslHandlers({
     storeAttendance: (...args) => saveAttendance(...args),
     requireDeviceKey: false,
+    logPostReceipt: (receipt) => receiptLogs.push(receipt),
   });
   let stored;
   saveAttendance = async (...args) => {
@@ -61,6 +67,7 @@ test("simple receiver URL works without a device key", async () => {
   assert.equal(response.status, 200);
   assert.equal(await response.text(), "OK");
   assert.equal(stored[2], "machine-42");
+  assertReceipt(receiptLogs[0], 200, Buffer.byteLength("attendance"));
 });
 
 test("POST saves raw payload, content type, and device serial without forwarding", async () => {
@@ -82,6 +89,7 @@ test("POST saves raw payload, content type, and device serial without forwarding
   assert.deepEqual(Buffer.from(stored[0]), rawBody);
   assert.equal(stored[1], "text/plain");
   assert.equal(stored[2], "machine-42");
+  assertReceipt(receiptLogs[0], 200, rawBody.byteLength);
 });
 
 test("POST accepts devices without a serial identifier", async () => {
@@ -115,6 +123,7 @@ test("POST rejects bodies larger than 64 KB", async () => {
 
   assert.equal(response.status, 413);
   assert.equal(await response.text(), "Attendance data exceeds 64 KB");
+  assertReceipt(receiptLogs[0], 413, 64 * 1024 + 1);
 });
 
 test("database failures return an error so the device can retry", async () => {
@@ -127,4 +136,13 @@ test("database failures return an error so the device can retry", async () => {
 
   assert.equal(response.status, 503);
   assert.equal(await response.text(), "Unable to store attendance data");
+  assertReceipt(receiptLogs[0], 503, Buffer.byteLength("attendance"));
 });
+
+function assertReceipt(receipt, status, byteCount) {
+  assert.deepEqual(Object.keys(receipt).sort(), ["byteCount", "status", "timestamp"]);
+  assert.equal(receipt.status, status);
+  assert.equal(receipt.byteCount, byteCount);
+  assert.match(receipt.timestamp, /^\d{4}-\d{2}-\d{2}T.*Z$/);
+  assert.doesNotMatch(JSON.stringify(receipt), /PIN|DateTime|attendance|machine-42|token/i);
+}
