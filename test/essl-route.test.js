@@ -40,6 +40,29 @@ test("GET returns the ESSL handshake as plain text", async () => {
   );
 });
 
+test("simple receiver URL works without a device key", async () => {
+  const simpleHandlers = createEsslHandlers({
+    storeAttendance: (...args) => saveAttendance(...args),
+    requireDeviceKey: false,
+  });
+  let stored;
+  saveAttendance = async (...args) => {
+    stored = args;
+  };
+  delete process.env.ESSL_DEVICE_KEY;
+
+  const handshake = await simpleHandlers.GET(new Request("https://receiver.test/api/essl"));
+  const response = await simpleHandlers.POST(
+    new Request("https://receiver.test/api/essl?SN=machine-42", { method: "POST", body: "attendance" }),
+  );
+
+  assert.equal(handshake.status, 200);
+  assert.match(await handshake.text(), /GET OPTION FROM: 1/);
+  assert.equal(response.status, 200);
+  assert.equal(await response.text(), "OK");
+  assert.equal(stored[2], "machine-42");
+});
+
 test("POST saves raw payload, content type, and device serial without forwarding", async () => {
   const rawBody = Buffer.from("PIN=42\tDateTime=2026-10-10 09:30:00\r\n");
   let stored;
